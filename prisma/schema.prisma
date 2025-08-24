@@ -1,0 +1,186 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String   @id @default(cuid())
+  email                   String   @unique
+  name                    String?
+  password                String?
+  googleId                String?  @unique
+  facebookId              String?  @unique
+  avatar                  String?
+  phone                   String?
+  document                String?  // CPF/CNPJ
+  verified                Boolean  @default(false)
+  emailVerified           Boolean  @default(false)
+  emailVerificationToken  String?
+  emailVerificationExpires DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  // Relations
+  complaints    Complaint[]
+  notifications Notification[]
+  preferences   UserPreference?
+
+  @@map("users")
+}
+
+model UserPreference {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  emailNotifications   Boolean  @default(true)
+  pushNotifications    Boolean  @default(true)
+  language             String   @default("pt-BR")
+  theme                String   @default("light")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  cnpj        String?  @unique
+  category    String
+  description String?
+  website     String?
+  logo        String?
+  rating      Float?   @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  complaints Complaint[]
+
+  @@map("companies")
+}
+
+model Complaint {
+  id              String           @id @default(cuid())
+  userId          String
+  companyId       String
+  title           String
+  description     String
+  status          ComplaintStatus  @default(ANALYSIS)
+  priority        Priority         @default(MEDIUM)
+  protocol        String           @unique
+  category        String
+  subcategory     String?
+  resolution      String?
+  resolutionDate  DateTime?
+  estimatedDate   DateTime?
+  channels        String?          // JSON array of channels where complaint was sent
+  documents       String?          // JSON array of document URLs
+  statusHistory   String?          // JSON array of status history
+  metadata        String?          // JSON for additional data
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  updates        ComplaintUpdate[]
+  notifications  Notification[]
+
+  @@map("complaints")
+}
+
+model ComplaintUpdate {
+  id          String   @id @default(cuid())
+  complaintId String
+  message     String
+  source      String   // "user", "company", "system", "channel"
+  channel     String?  // Which channel provided this update
+  metadata    String?  // JSON for additional data
+  createdAt   DateTime @default(now())
+
+  // Relations
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  @@map("complaint_updates")
+}
+
+model RightsContent {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  category    String
+  tags        String?          // JSON array of tags
+  videoUrl    String?
+  readTime    Int?     // Reading time in minutes
+  published   Boolean  @default(true)
+  views       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("rights_contents")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType
+  read      Boolean          @default(false)
+  metadata  String?          // JSON for additional data
+  createdAt DateTime         @default(now())
+
+  // Relations
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  complaint Complaint?        @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  complaintId String?
+
+  @@map("notifications")
+}
+
+enum ComplaintStatus {
+  ANALYSIS      // Em análise
+  WAITING       // Aguardando resposta
+  RESPONDED     // Respondida
+  RESOLVED      // Resolvida
+  NOT_RESOLVED  // Não resolvida
+  CANCELLED     // Cancelada
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NotificationType {
+  COMPLAINT_CREATED
+  COMPLAINT_UPDATED
+  COMPLAINT_RESOLVED
+  SYSTEM
+  MARKETING
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
